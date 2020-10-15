@@ -25,5 +25,6 @@ develop:
 build:
 	rm -rf dist
 	NODE_ENV=production npx webpack
+	npm run beautify
 
 .PHONY: test
