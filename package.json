@@ -46,6 +46,10 @@
     "webpack-dev-server": "^3.11.0"
   },
   "dependencies": {
-    "bootstrap": "^4.5.3"
+    "axios": "^0.21.0",
+    "bootstrap": "^4.5.3",
+    "lodash": "^4.17.20",
+    "on-change": "^2.2.0",
+    "yup": "^0.32.5"
   }
 }

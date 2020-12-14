@@ -9,7 +9,7 @@ module.exports = {
   output: {
     filename: './main.js',
   },
-  devtool: "source-map",
+  devtool: 'source-map',
   module: {
     rules: [
       {
@@ -29,5 +29,5 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: 'index.html',
     }),
-  ]  
+  ],
 };
