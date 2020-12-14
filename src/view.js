@@ -1,8 +1,8 @@
 import onChange from 'on-change';
 
-const renderFeeds = (feeds, feedsEl) => {
+const renderFeeds = (feeds, feedsEl, pageText) => {
   const h2El = document.createElement('h2');
-  h2El.textContent = 'Feeds';
+  h2El.textContent = pageText.t('feeds.title');
 
   const listEl = document.createElement('ul');
   listEl.classList.add('list-group', 'mb-5');
@@ -28,9 +28,9 @@ const renderFeeds = (feeds, feedsEl) => {
   feedsEl.appendChild(listEl);
 };
 
-const renderPosts = (posts, postsEl) => {
+const renderPosts = (posts, postsEl, pageText) => {
   const h2El = document.createElement('h2');
-  h2El.textContent = 'Posts';
+  h2El.textContent = pageText.t('posts.title');
 
   const listEl = document.createElement('ul');
   listEl.classList.add('list-group');
@@ -68,7 +68,7 @@ const renderPosts = (posts, postsEl) => {
       buttonEl.setAttribute('data-id', post.id);
       buttonEl.setAttribute('data-toggle', 'modal');
       buttonEl.setAttribute('data-target', '#modal');
-      buttonEl.textContent = 'Preview';
+      buttonEl.textContent = pageText.t('posts.preview');
 
       itemEl.appendChild(aEl);
       itemEl.appendChild(buttonEl);
@@ -81,14 +81,19 @@ const renderPosts = (posts, postsEl) => {
   postsEl.appendChild(listEl);
 };
 
-const processStateHandler = (state, stateStatuses, pageElements, processState) => {
+const processStateHandler = (state, stateStatuses, pageElements, processState, pageText) => {
   const { rssForm } = pageElements;
   const { feedback } = pageElements;
 
   const rssFormStatuses = stateStatuses.rssForm;
 
   switch (processState) {
-    case rssFormStatuses.ready:
+    case rssFormStatuses.init:
+      pageElements.title.textContent = pageText.t('title');
+      pageElements.desc.textContent = pageText.t('description');
+      pageElements.example.textContent = pageText.t('example');
+      pageElements.rssForm.input.setAttribute('placeholder', pageText.t('rssForm.placeholder'));
+      pageElements.rssForm.submit.textContent = pageText.t('rssForm.submit');
       break;
     case rssFormStatuses.submitting:
       rssForm.input.classList.remove('is-invalid');
@@ -97,7 +102,7 @@ const processStateHandler = (state, stateStatuses, pageElements, processState) =
 
       feedback.classList.remove('text-danger');
       feedback.classList.remove('text-success');
-      feedback.textContent = 'Adding Rss';
+      feedback.textContent = pageText.t('feedback.submittingRSS');
       break;
     case rssFormStatuses.processed:
       rssForm.input.classList.remove('is-invalid');
@@ -113,8 +118,8 @@ const processStateHandler = (state, stateStatuses, pageElements, processState) =
       }
       feedback.textContent = state.rssForm.processMsg;
 
-      renderFeeds(state.rssForm.data.feeds, pageElements.feeds);
-      renderPosts(state.rssForm.data.posts, pageElements.posts);
+      renderFeeds(state.rssForm.data.feeds, pageElements.feeds, pageText);
+      renderPosts(state.rssForm.data.posts, pageElements.posts, pageText);
 
       break;
     case rssFormStatuses.declined:
@@ -135,11 +140,11 @@ const processStateHandler = (state, stateStatuses, pageElements, processState) =
   }
 };
 
-export default (state, stateStatuses, pageElements) => {
+export default (state, stateStatuses, pageElements, pageText) => {
   const watchedState = onChange(state, (path, value) => {
     switch (path) {
       case 'rssForm.processState':
-        processStateHandler(state, stateStatuses, pageElements, value);
+        processStateHandler(state, stateStatuses, pageElements, value, pageText);
         break;
       default:
         break;
