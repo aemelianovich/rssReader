@@ -150,6 +150,7 @@ export default () => {
       }
     });
   }).catch((err) => {
+    // eslint-disable-next-line no-alert
     alert(err.message);
     throw err;
   });
