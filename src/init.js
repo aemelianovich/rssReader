@@ -12,6 +12,7 @@ const stateStatuses = {
     submitting: 'submitting',
     processed: 'processed',
     declined: 'declined',
+    refreshed: 'refreshed',
   },
 };
 
@@ -94,13 +95,78 @@ const parseRss = (rssStr) => {
   return channel;
 };
 
+const addFeed = (watchedState, newFeed) => {
+  const { feeds } = watchedState.rssForm.data;
+  if (_.findIndex(feeds, { rssUrl: newFeed.rssUrl }) === -1) {
+    feeds.push(newFeed);
+  }
+};
+
+const addPosts = (watchedState, newPosts) => {
+  const { posts } = watchedState.rssForm.data;
+  const filteredPosts = newPosts.filter((newPost) => {
+    if (_.findIndex(posts, { link: newPost.link }) === -1) {
+      return true;
+    }
+
+    return false;
+  });
+
+  watchedState.rssForm.data.posts = [...posts, ...filteredPosts];
+};
+
+const populateFeed = (url, watchedState) => {
+  axios({
+    method: 'get',
+    url: '/get',
+    params: {
+      url: `${url}`,
+    },
+    baseURL: 'https://api.allorigins.win/',
+  }).then((response) => {
+    try {
+      const channel = parseRss(response.data.contents);
+      channel.feed.rssUrl = response.config.params.url;
+
+      addFeed(watchedState, channel.feed);
+      addPosts(watchedState, channel.posts);
+
+      watchedState.rssForm.processMsg = i18n.t('feedback.addedRss');
+      watchedState.rssForm.processState = stateStatuses.rssForm.processed;
+    } catch (err) {
+      watchedState.rssForm.processMsg = err.message;
+      watchedState.rssForm.processState = stateStatuses.rssForm.declined;
+    }
+  }).catch((err) => {
+    console.log(err);
+    watchedState.rssForm.processMsg = err.message;
+    watchedState.rssForm.processState = stateStatuses.rssForm.declined;
+  });
+};
+
+const refreshFeeds = (watchedState) => {
+  try {
+    const { feeds } = watchedState.rssForm.data;
+    feeds.forEach((feed) => {
+      populateFeed(feed.rssUrl, watchedState);
+    });
+  } catch (err) {
+    console.log(err);
+    watchedState.rssForm.processMsg = err.message;
+    watchedState.rssForm.processState = stateStatuses.rssForm.declined;
+  }
+
+  watchedState.rssForm.processState = stateStatuses.rssForm.refreshed;
+
+  setTimeout(refreshFeeds, 5 * 1000, watchedState);
+};
+
 export default () => {
   i18n.init({
     lng: state.lng,
     debug: true,
     resources,
   }).then(() => {
-    console.log(i18n.t('title'));
     const watchedState = createWatchedState(state, stateStatuses, pageElements, i18n);
     watchedState.rssForm.processState = stateStatuses.rssForm.init;
 
@@ -116,39 +182,14 @@ export default () => {
       const errMsg = validateRssForm(url, addedRssUrls);
 
       if (errMsg === null) {
-        axios({
-          method: 'get',
-          url: '/get',
-          params: {
-            url: `${url}`,
-          },
-          baseURL: 'https://api.allorigins.win/',
-        }).then((response) => {
-          console.log(response);
-          try {
-            const channel = parseRss(response.data.contents);
-            channel.feed.rssUrl = response.config.params.url;
-
-            watchedState.rssForm.data.feeds.push(channel.feed);
-            watchedState.rssForm.data.posts = [...watchedState.rssForm.data.posts,
-              ...channel.posts];
-
-            watchedState.rssForm.processMsg = i18n.t('feedback.addedRss');
-            watchedState.rssForm.processState = stateStatuses.rssForm.processed;
-          } catch (err) {
-            watchedState.rssForm.processMsg = err.message;
-            watchedState.rssForm.processState = stateStatuses.rssForm.declined;
-          }
-        }).catch((err) => {
-          console.log(err);
-          watchedState.rssForm.processMsg = err.message;
-          watchedState.rssForm.processState = stateStatuses.rssForm.declined;
-        });
+        populateFeed(url, watchedState);
       } else {
         watchedState.rssForm.processMsg = errMsg;
         watchedState.rssForm.processState = stateStatuses.rssForm.declined;
       }
     });
+
+    setTimeout(refreshFeeds, 5 * 1000, watchedState);
   }).catch((err) => {
     // eslint-disable-next-line no-alert
     alert(err.message);
