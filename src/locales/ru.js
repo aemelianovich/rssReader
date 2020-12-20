@@ -4,7 +4,7 @@ export default {
     description: 'Скачивайте RSS сегодня! Это легко и просто.',
     example: 'Пример: https://ru.hexlet.io/lessons.rss',
     feedback: {
-      validUrl: 'Введите корректную ссылку',
+      invalidUrl: 'Введите корректную ссылку',
       existsRss: 'RSS канал уже был добавлен',
       addedRss: 'RSS канал добавлен',
       submittingRSS: 'Добавление RSS канала ...',
@@ -19,6 +19,10 @@ export default {
     posts: {
       title: 'Посты',
       preview: 'Обзор',
+    },
+    modal: {
+      article: 'Полная статья',
+      close: 'Закрыть',
     },
   },
 };

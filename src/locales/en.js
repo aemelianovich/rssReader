@@ -4,7 +4,7 @@ export default {
     description: 'Start reading RSS today! It is easy, it is nicely.',
     example: 'Example: https://ru.hexlet.io/lessons.rss',
     feedback: {
-      validUrl: 'Must be valid url',
+      invalidUrl: 'Must be valid url',
       existsRss: 'Rss has been loaded',
       addedRss: 'Rss was added',
       submittingRSS: 'Adding Rss ...',
@@ -19,6 +19,10 @@ export default {
     posts: {
       title: 'Posts',
       preview: 'Preview',
+    },
+    modal: {
+      article: 'Full article',
+      close: 'Close',
     },
   },
 };

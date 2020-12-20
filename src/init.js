@@ -1,4 +1,5 @@
-import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap';
+import 'bootstrap/dist/css/bootstrap.css';
 import * as yup from 'yup';
 import axios from 'axios';
 import _ from 'lodash';
@@ -6,32 +7,34 @@ import i18n from 'i18next';
 import createWatchedState from './view.js';
 import resources from './locales';
 
+// init -> processing -> invalid
+// init -> processing -> failed
+// init -> processing -> success
 const stateStatuses = {
-  rssForm: {
-    init: 'init',
-    submitting: 'submitting',
-    processed: 'processed',
-    declined: 'declined',
-    refreshed: 'refreshed',
-  },
+  init: 'init',
+  processing: 'processing',
+  invalid: 'invalid',
+  failed: 'failed',
+  success: 'success',
 };
 
 const state = {
-  lng: 'en',
+  lng: 'ru',
   rssForm: {
     processState: null,
     processMsg: null,
-    data: {
-      feeds: [],
-      posts: [],
-    },
   },
+  data: {
+    feeds: [],
+    posts: [],
+  },
+  modal: {},
 };
 
 const pageElements = {
-  title: document.querySelector('.jumbotron').querySelector('h1'),
-  desc: document.querySelector('.jumbotron').querySelector('.description'),
-  example: document.querySelector('.jumbotron').querySelector('.example'),
+  title: document.querySelector('h1'),
+  desc: document.querySelector('.lead'),
+  example: document.querySelector('.example'),
   rssForm: {
     form: document.querySelector('.rss-form'),
     fieldset: document.querySelector('.rss-form').querySelector('fieldset'),
@@ -41,12 +44,13 @@ const pageElements = {
   feedback: document.querySelector('.feedback'),
   feeds: document.querySelector('.feeds'),
   posts: document.querySelector('.posts'),
+  modal: document.querySelector('#modal'),
 };
 
 const validateRssForm = (url, addedUrls) => {
   yup.setLocale({
     string: {
-      url: i18n.t('feedback.validUrl'),
+      url: i18n.t('feedback.invalidUrl'),
     },
   });
 
@@ -67,7 +71,6 @@ const parseRss = (rssStr) => {
     throw new Error(errorEl.textContent);
   }
 
-  // const spans = ul.querySelectorAll('.odd > span');
   const feedId = _.uniqueId();
   const channel = {
     feed: {
@@ -87,6 +90,7 @@ const parseRss = (rssStr) => {
       title: postEl.querySelector('title').textContent,
       link: postEl.querySelector('link').textContent,
       desc: postEl.querySelector('description').textContent,
+      isViewed: false,
     };
 
     channel.posts.push(post);
@@ -96,96 +100,101 @@ const parseRss = (rssStr) => {
 };
 
 const addFeed = (watchedState, newFeed) => {
-  const { feeds } = watchedState.rssForm.data;
-  if (_.findIndex(feeds, { rssUrl: newFeed.rssUrl }) === -1) {
-    feeds.push(newFeed);
-  }
+  const { feeds } = watchedState.data;
+  watchedState.data.feeds = _.uniqBy([...feeds, newFeed], 'rssUrl');
 };
 
 const addPosts = (watchedState, newPosts) => {
-  const { posts } = watchedState.rssForm.data;
-  const filteredPosts = newPosts.filter((newPost) => {
-    if (_.findIndex(posts, { link: newPost.link }) === -1) {
-      return true;
-    }
-
-    return false;
-  });
-
-  watchedState.rssForm.data.posts = [...posts, ...filteredPosts];
+  const { posts } = watchedState.data;
+  watchedState.data.posts = _.uniqBy([...posts, ...newPosts], 'link');
 };
 
-const populateFeed = (url, watchedState) => {
-  axios({
-    method: 'get',
-    url: '/get',
-    params: {
-      url: `${url}`,
-    },
-    baseURL: 'https://api.allorigins.win/',
-  }).then((response) => {
-    try {
-      const channel = parseRss(response.data.contents);
-      channel.feed.rssUrl = response.config.params.url;
-
-      addFeed(watchedState, channel.feed);
-      addPosts(watchedState, channel.posts);
-
-      watchedState.rssForm.processMsg = i18n.t('feedback.addedRss');
-      watchedState.rssForm.processState = stateStatuses.rssForm.processed;
-    } catch (err) {
-      watchedState.rssForm.processMsg = err.message;
-      watchedState.rssForm.processState = stateStatuses.rssForm.declined;
-    }
-  }).catch((err) => {
-    console.log(err);
-    watchedState.rssForm.processMsg = err.message;
-    watchedState.rssForm.processState = stateStatuses.rssForm.declined;
+const populateFeed = (url, watchedState) => axios({
+  method: 'get',
+  url: '/get',
+  params: {
+    url: `${url}`,
+  },
+  baseURL: 'https://api.allorigins.win/',
+})
+  .then((response) => {
+    const channel = parseRss(response.data.contents);
+    channel.feed.rssUrl = response.config.params.url;
+    return channel;
+  })
+  .then((channel) => {
+    addFeed(watchedState, channel.feed);
+    addPosts(watchedState, channel.posts);
   });
-};
 
 const refreshFeeds = (watchedState) => {
-  try {
-    const { feeds } = watchedState.rssForm.data;
-    feeds.forEach((feed) => {
-      populateFeed(feed.rssUrl, watchedState);
-    });
-  } catch (err) {
-    console.log(err);
-    watchedState.rssForm.processMsg = err.message;
-    watchedState.rssForm.processState = stateStatuses.rssForm.declined;
-  }
+  const { feeds } = watchedState.data;
+  const feedPromises = [];
+  feeds.forEach((feed) => {
+    const feedPromise = populateFeed(feed.rssUrl, watchedState)
+      .catch((err) => {
+        console.log(err);
+      });
+    feedPromises.push(feedPromise);
+  });
 
-  watchedState.rssForm.processState = stateStatuses.rssForm.refreshed;
-
-  setTimeout(refreshFeeds, 5 * 1000, watchedState);
+  const refreshAll = Promise.all(feedPromises);
+  return refreshAll.then(() => setTimeout(refreshFeeds, 5 * 1000, watchedState));
 };
 
 export default () => {
+  const watchedState = createWatchedState(state, stateStatuses, pageElements, i18n);
+
   i18n.init({
     lng: state.lng,
     debug: true,
     resources,
   }).then(() => {
-    const watchedState = createWatchedState(state, stateStatuses, pageElements, i18n);
-    watchedState.rssForm.processState = stateStatuses.rssForm.init;
+    watchedState.rssForm.processState = stateStatuses.init;
 
     pageElements.rssForm.form.addEventListener('submit', (e) => {
       e.preventDefault();
       const rssForm = new FormData(e.target);
-      watchedState.rssForm.processState = stateStatuses.rssForm.submitting;
+      watchedState.rssForm.processState = stateStatuses.processing;
 
       const url = rssForm.get('url');
-      const addedRssUrls = watchedState.rssForm.data.feeds
+      const addedRssUrls = watchedState.data.feeds
         .map(({ rssUrl }) => (rssUrl || null));
 
       const errMsg = validateRssForm(url, addedRssUrls);
 
       if (errMsg === null) {
-        populateFeed(url, watchedState);
+        populateFeed(url, watchedState)
+          .then(() => {
+            watchedState.rssForm.processMsg = i18n.t('feedback.addedRss');
+            watchedState.rssForm.processState = stateStatuses.success;
+          })
+          .catch((err) => {
+            console.log(err);
+            watchedState.rssForm.processMsg = err.message;
+            watchedState.rssForm.processState = stateStatuses.failed;
+          });
       } else {
         watchedState.rssForm.processMsg = errMsg;
-        watchedState.rssForm.processState = stateStatuses.rssForm.declined;
+        watchedState.rssForm.processState = stateStatuses.invalid;
+      }
+    });
+
+    pageElements.posts.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (e.target.getAttribute('data-target') === '#modal') {
+        const postId = e.target.getAttribute('data-id');
+        const postPreviewIndex = _.findIndex(watchedState.data.posts,
+          (currPost) => (currPost.id === postId));
+        const postPreview = watchedState.data.posts[postPreviewIndex];
+
+        postPreview.isViewed = true;
+        watchedState.modal = {
+          id: postPreview.id,
+          title: postPreview.title,
+          desc: postPreview.desc,
+          link: postPreview.link,
+        };
       }
     });
 
