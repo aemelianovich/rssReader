@@ -1,6 +1,7 @@
 import onChange from 'on-change';
+import stateStatuses from './constants.js';
 
-const processStateHandler = (state, stateStatuses, pageElements, processState, pageText) => {
+const processStateHandler = (state, pageElements, processState, pageText) => {
   const { rssForm } = pageElements;
   const { feedback } = pageElements;
 
@@ -101,7 +102,15 @@ const renderFeeds = (feeds, feedsEl, pageText) => {
   }
 };
 
-const renderPosts = (posts, postsEl, pageText) => {
+const renderViewedPosts = (viewedPosts, postsEl) => {
+  viewedPosts.forEach((id) => {
+    const postEl = postsEl.querySelector(`a[data-id="${id}"]`);
+    postEl.classList.remove('font-weight-bold');
+    postEl.classList.add('font-weight-normal');
+  });
+};
+
+const renderPosts = (posts, postsEl, pageText, viewedPosts) => {
   if (posts.length > 0) {
     const titleEl = document.createElement('h2');
     titleEl.textContent = pageText.t('posts.title');
@@ -130,12 +139,7 @@ const renderPosts = (posts, postsEl, pageText) => {
 
         const aEl = document.createElement('a');
         aEl.href = post.link;
-        if (post.isViewed) {
-          aEl.classList.add('font-weight-normal');
-        } else {
-          aEl.classList.add('font-weight-bold');
-        }
-
+        aEl.classList.add('font-weight-bold');
         aEl.setAttribute('data-id', post.id);
         aEl.setAttribute('target', '_blank');
         aEl.setAttribute('rel', 'noopener noreferrer');
@@ -161,20 +165,10 @@ const renderPosts = (posts, postsEl, pageText) => {
 
     postsEl.innerHTML = '';
     postsEl.appendChild(postsFragment);
+
+    renderViewedPosts(viewedPosts, postsEl);
   } else {
     postsEl.innerHTML = '';
-  }
-};
-
-const renderPostIsViewed = (postIndex, posts, postsEl, value) => {
-  const postId = posts[postIndex].id;
-  const postEl = postsEl.querySelector(`a[data-id="${postId}"]`);
-  if (value) {
-    postEl.classList.remove('font-weight-bold');
-    postEl.classList.add('font-weight-normal');
-  } else {
-    postEl.classList.remove('font-weight-normal');
-    postEl.classList.add('font-weight-bold');
   }
 };
 
@@ -184,33 +178,20 @@ const renderModal = (modal, modalEl) => {
   modalEl.querySelector('.full-article').href = modal.link;
 };
 
-export default (state, stateStatuses, pageElements, pageText) => {
+export default (state, pageElements, pageText) => {
   const watchedState = onChange(state, (path, value) => {
-    const regex = RegExp(/^(data.posts).(\d+).(isViewed)$/);
-    let checkPath = '';
-    let postIndex = null;
-
-    if (regex.test(path)) {
-      const pathGroups = path.match(regex);
-      checkPath = `${pathGroups[1]}.*.${pathGroups[3]}`;
-      // eslint-disable-next-line prefer-destructuring
-      postIndex = pathGroups[2];
-    } else {
-      checkPath = path;
-    }
-
-    switch (checkPath) {
+    switch (path) {
       case 'rssForm.processState':
-        processStateHandler(state, stateStatuses, pageElements, value, pageText);
+        processStateHandler(state, pageElements, value, pageText);
         break;
       case 'data.feeds':
         renderFeeds(state.data.feeds, pageElements.feeds, pageText);
         break;
       case 'data.posts':
-        renderPosts(state.data.posts, pageElements.posts, pageText);
+        renderPosts(state.data.posts, pageElements.posts, pageText, state.ui.viewedPosts);
         break;
-      case 'data.posts.*.isViewed':
-        renderPostIsViewed(postIndex, state.data.posts, pageElements.posts, value);
+      case 'ui.viewedPosts':
+        renderViewedPosts(state.ui.viewedPosts, pageElements.posts);
         break;
       case 'modal':
         renderModal(state.modal, pageElements.modal);

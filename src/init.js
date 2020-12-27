@@ -6,46 +6,7 @@ import _ from 'lodash';
 import i18n from 'i18next';
 import createWatchedState from './view.js';
 import resources from './locales';
-
-// init -> processing -> invalid
-// init -> processing -> failed
-// init -> processing -> success
-const stateStatuses = {
-  init: 'init',
-  processing: 'processing',
-  invalid: 'invalid',
-  failed: 'failed',
-  success: 'success',
-};
-
-const state = {
-  lng: 'ru',
-  rssForm: {
-    processState: null,
-    processMsg: null,
-  },
-  data: {
-    feeds: [],
-    posts: [],
-  },
-  modal: {},
-};
-
-const pageElements = {
-  title: document.querySelector('h1'),
-  desc: document.querySelector('.lead'),
-  example: document.querySelector('.example'),
-  rssForm: {
-    form: document.querySelector('.rss-form'),
-    fieldset: document.querySelector('.rss-form').querySelector('fieldset'),
-    input: document.querySelector('.rss-form').querySelector('input'),
-    submit: document.querySelector('.rss-form').querySelector('button'),
-  },
-  feedback: document.querySelector('.feedback'),
-  feeds: document.querySelector('.feeds'),
-  posts: document.querySelector('.posts'),
-  modal: document.querySelector('#modal'),
-};
+import stateStatuses from './constants.js';
 
 const validateRssForm = (url, addedUrls) => {
   yup.setLocale({
@@ -64,8 +25,8 @@ const validateRssForm = (url, addedUrls) => {
   }
 };
 
-const parseRss = (rssStr) => {
-  const rssDocument = new DOMParser().parseFromString(rssStr, 'text/xml');
+const parseRss = (rssData) => {
+  const rssDocument = new DOMParser().parseFromString(rssData, 'text/xml');
   const errorEl = rssDocument.querySelector('parsererror');
   if (errorEl !== null) {
     throw new Error(errorEl.textContent);
@@ -90,7 +51,6 @@ const parseRss = (rssStr) => {
       title: postEl.querySelector('title').textContent,
       link: postEl.querySelector('link').textContent,
       desc: postEl.querySelector('description').textContent,
-      isViewed: false,
     };
 
     channel.posts.push(post);
@@ -143,7 +103,39 @@ const refreshFeeds = (watchedState) => {
 };
 
 export default () => {
-  const watchedState = createWatchedState(state, stateStatuses, pageElements, i18n);
+  const state = {
+    lng: 'ru',
+    rssForm: {
+      processState: null,
+      processMsg: null,
+    },
+    data: {
+      feeds: [],
+      posts: [],
+    },
+    modal: {},
+    ui: {
+      viewedPosts: new Set(),
+    },
+  };
+
+  const pageElements = {
+    title: document.querySelector('h1'),
+    desc: document.querySelector('.lead'),
+    example: document.querySelector('.example'),
+    rssForm: {
+      form: document.querySelector('.rss-form'),
+      fieldset: document.querySelector('.rss-form').querySelector('fieldset'),
+      input: document.querySelector('.rss-form').querySelector('input'),
+      submit: document.querySelector('.rss-form').querySelector('button'),
+    },
+    feedback: document.querySelector('.feedback'),
+    feeds: document.querySelector('.feeds'),
+    posts: document.querySelector('.posts'),
+    modal: document.querySelector('#modal'),
+  };
+
+  const watchedState = createWatchedState(state, pageElements, i18n);
 
   i18n.init({
     lng: state.lng,
@@ -188,7 +180,7 @@ export default () => {
           (currPost) => (currPost.id === postId));
         const postPreview = watchedState.data.posts[postPreviewIndex];
 
-        postPreview.isViewed = true;
+        watchedState.ui.viewedPosts.add(postPreview.id);
         watchedState.modal = {
           id: postPreview.id,
           title: postPreview.title,
