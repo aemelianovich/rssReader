@@ -6,14 +6,16 @@ import _ from 'lodash';
 import i18n from 'i18next';
 import createWatchedState from './view.js';
 import resources from './locales';
-import stateStatuses from './constants.js';
+import { stateStatuses, refreshTimeout } from './constants.js';
 
-const validateRssForm = (url, addedUrls) => {
+const validateRssForm = (url, feeds) => {
   yup.setLocale({
     string: {
       url: i18n.t('feedback.invalidUrl'),
     },
   });
+
+  const addedUrls = feeds.map(({ rssUrl }) => (rssUrl || null));
 
   const urlSchema = yup.string().url().notOneOf(addedUrls, i18n.t('feedback.existsRss'));
 
@@ -69,7 +71,7 @@ const addPosts = (watchedState, newPosts) => {
   watchedState.data.posts = _.uniqBy([...posts, ...newPosts], 'link');
 };
 
-const populateFeed = (url, watchedState) => axios({
+const loadFeed = (url, watchedState) => axios({
   method: 'get',
   url: '/get',
   params: {
@@ -87,11 +89,25 @@ const populateFeed = (url, watchedState) => axios({
     addPosts(watchedState, channel.posts);
   });
 
+const submitFeed = (url, watchedState) => {
+  watchedState.rssForm.processState = stateStatuses.processing;
+  return loadFeed(url, watchedState)
+    .then(() => {
+      watchedState.rssForm.processMsg = i18n.t('feedback.addedRss');
+      watchedState.rssForm.processState = stateStatuses.success;
+    })
+    .catch((err) => {
+      console.log(err);
+      watchedState.rssForm.processMsg = err.message;
+      watchedState.rssForm.processState = stateStatuses.failed;
+    });
+};
+
 const refreshFeeds = (watchedState) => {
   const { feeds } = watchedState.data;
   const feedPromises = [];
   feeds.forEach((feed) => {
-    const feedPromise = populateFeed(feed.rssUrl, watchedState)
+    const feedPromise = loadFeed(feed.rssUrl, watchedState)
       .catch((err) => {
         console.log(err);
       });
@@ -117,6 +133,7 @@ export default () => {
     ui: {
       viewedPosts: new Set(),
     },
+    errors: [],
   };
 
   const pageElements = {
@@ -137,9 +154,9 @@ export default () => {
 
   const watchedState = createWatchedState(state, pageElements, i18n);
 
-  i18n.init({
+  const initPromise = i18n.init({
     lng: state.lng,
-    debug: true,
+    debug: false,
     resources,
   }).then(() => {
     watchedState.rssForm.processState = stateStatuses.init;
@@ -147,25 +164,14 @@ export default () => {
     pageElements.rssForm.form.addEventListener('submit', (e) => {
       e.preventDefault();
       const rssForm = new FormData(e.target);
-      watchedState.rssForm.processState = stateStatuses.processing;
 
       const url = rssForm.get('url');
-      const addedRssUrls = watchedState.data.feeds
-        .map(({ rssUrl }) => (rssUrl || null));
 
-      const errMsg = validateRssForm(url, addedRssUrls);
+      watchedState.rssForm.processState = stateStatuses.validating;
+      const errMsg = validateRssForm(url, watchedState.data.feeds);
 
       if (errMsg === null) {
-        populateFeed(url, watchedState)
-          .then(() => {
-            watchedState.rssForm.processMsg = i18n.t('feedback.addedRss');
-            watchedState.rssForm.processState = stateStatuses.success;
-          })
-          .catch((err) => {
-            console.log(err);
-            watchedState.rssForm.processMsg = err.message;
-            watchedState.rssForm.processState = stateStatuses.failed;
-          });
+        submitFeed(url, watchedState);
       } else {
         watchedState.rssForm.processMsg = errMsg;
         watchedState.rssForm.processState = stateStatuses.invalid;
@@ -173,7 +179,6 @@ export default () => {
     });
 
     pageElements.posts.addEventListener('click', (e) => {
-      e.preventDefault();
       if (e.target.getAttribute('data-target') === '#modal') {
         const postId = e.target.getAttribute('data-id');
         const postPreviewIndex = _.findIndex(watchedState.data.posts,
@@ -190,10 +195,11 @@ export default () => {
       }
     });
 
-    setTimeout(refreshFeeds, 5 * 1000, watchedState);
+    setTimeout(refreshFeeds, refreshTimeout, watchedState);
   }).catch((err) => {
-    // eslint-disable-next-line no-alert
-    alert(err.message);
+    watchedState.errors.push(err);
     throw err;
   });
+
+  return initPromise;
 };

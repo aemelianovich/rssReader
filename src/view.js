@@ -1,5 +1,5 @@
 import onChange from 'on-change';
-import stateStatuses from './constants.js';
+import { stateStatuses } from './constants.js';
 
 const processStateHandler = (state, pageElements, processState, pageText) => {
   const { rssForm } = pageElements;
@@ -15,6 +15,14 @@ const processStateHandler = (state, pageElements, processState, pageText) => {
       pageElements.modal.querySelector('.full-article').textContent = pageText.t('modal.article');
       pageElements.modal.querySelector('.btn-secondary').textContent = pageText.t('modal.close');
 
+      break;
+    case stateStatuses.validating:
+      rssForm.input.classList.remove('is-invalid');
+      rssForm.fieldset.disabled = true;
+
+      feedback.classList.remove('text-danger');
+      feedback.classList.remove('text-success');
+      feedback.textContent = pageText.t('feedback.validatingRSS');
       break;
     case stateStatuses.processing:
       rssForm.input.classList.remove('is-invalid');

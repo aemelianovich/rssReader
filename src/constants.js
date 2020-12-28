@@ -1,9 +1,12 @@
 const stateStatuses = {
   init: 'init',
-  processing: 'processing',
+  validating: 'validating',
   invalid: 'invalid',
+  processing: 'processing',
   failed: 'failed',
   success: 'success',
 };
 
-export default stateStatuses;
+const refreshTimeout = 5 * 1000;
+
+export { refreshTimeout, stateStatuses };

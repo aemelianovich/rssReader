@@ -4,6 +4,7 @@ export default {
     description: 'Start reading RSS today! It is easy, it is nicely.',
     example: 'Example: https://ru.hexlet.io/lessons.rss',
     feedback: {
+      validatingRSS: 'Validating ...',
       invalidUrl: 'Must be valid url',
       existsRss: 'Rss has been loaded',
       addedRss: 'Rss was added',
