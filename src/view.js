@@ -127,20 +127,6 @@ const renderPosts = (posts, postsEl, pageText, viewedPosts) => {
     listEl.classList.add('list-group');
 
     posts
-      .sort((postA, postB) => {
-        const feedIdA = Number(postA.feedId);
-        const feedIdB = Number(postB.feedId);
-        const postIdA = Number(postA.id);
-        const postIdB = Number(postB.id);
-
-        if ((feedIdA > feedIdB) || (feedIdA === feedIdB && postIdA < postIdB)) {
-          return -1;
-        }
-        if ((feedIdA < feedIdB) || (feedIdA === feedIdB && postIdA > postIdB)) {
-          return 1;
-        }
-        return 0;
-      })
       .forEach((post) => {
         const itemEl = document.createElement('li');
         itemEl.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-start');
@@ -164,7 +150,7 @@ const renderPosts = (posts, postsEl, pageText, viewedPosts) => {
         itemEl.appendChild(aEl);
         itemEl.appendChild(buttonEl);
 
-        listEl.appendChild(itemEl);
+        listEl.prepend(itemEl);
       });
 
     const postsFragment = document.createDocumentFragment();

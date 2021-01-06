@@ -15,7 +15,7 @@ const validateRssForm = (url, feeds) => {
     },
   });
 
-  const addedUrls = feeds.map(({ rssUrl }) => (rssUrl || null));
+  const addedUrls = feeds.map(({ rssUrl }) => (rssUrl));
 
   const urlSchema = yup.string().url().notOneOf(addedUrls, i18n.t('feedback.existsRss'));
 
@@ -34,41 +34,22 @@ const parseRss = (rssData) => {
     throw new Error(errorEl.textContent);
   }
 
-  const feedId = _.uniqueId();
+  const postElements = [...rssDocument.querySelectorAll('channel > item')];
+
   const channel = {
-    feed: {
-      id: feedId,
-      title: rssDocument.querySelector('channel > title').textContent,
-      desc: rssDocument.querySelector('channel > description').textContent,
-    },
-    posts: [],
+    title: rssDocument.querySelector('channel > title').textContent,
+    description: rssDocument.querySelector('channel > description').textContent,
+    posts: postElements.map((postEl) => {
+      const post = {
+        title: postEl.querySelector('title').textContent,
+        link: postEl.querySelector('link').textContent,
+        description: postEl.querySelector('description').textContent,
+      };
+      return post;
+    }),
   };
 
-  const postElements = rssDocument.querySelectorAll('channel > item');
-
-  postElements.forEach((postEl) => {
-    const post = {
-      feedId,
-      id: _.uniqueId(),
-      title: postEl.querySelector('title').textContent,
-      link: postEl.querySelector('link').textContent,
-      desc: postEl.querySelector('description').textContent,
-    };
-
-    channel.posts.push(post);
-  });
-
   return channel;
-};
-
-const addFeed = (watchedState, newFeed) => {
-  const { feeds } = watchedState.data;
-  watchedState.data.feeds = _.uniqBy([...feeds, newFeed], 'rssUrl');
-};
-
-const addPosts = (watchedState, newPosts) => {
-  const { posts } = watchedState.data;
-  watchedState.data.posts = _.uniqBy([...posts, ...newPosts], 'link');
 };
 
 const loadFeed = (url, watchedState) => axios({
@@ -81,12 +62,26 @@ const loadFeed = (url, watchedState) => axios({
 })
   .then((response) => {
     const channel = parseRss(response.data.contents);
-    channel.feed.rssUrl = response.config.params.url;
-    return channel;
-  })
-  .then((channel) => {
-    addFeed(watchedState, channel.feed);
-    addPosts(watchedState, channel.posts);
+
+    const feed = {
+      id: _.uniqueId(),
+      rssUrl: response.config.params.url,
+      title: channel.title,
+      desc: channel.description,
+    };
+
+    const posts = channel.posts
+      .map((post) => ({
+        feedId: feed.id,
+        id: _.uniqueId(),
+        title: post.title,
+        link: post.link,
+        desc: post.description,
+      }))
+      .reverse();
+
+    watchedState.data.feeds = _.uniqBy([...watchedState.data.feeds, feed], 'rssUrl');
+    watchedState.data.posts = _.uniqBy([...watchedState.data.posts, ...posts], 'link');
   });
 
 const submitFeed = (url, watchedState) => {
@@ -105,17 +100,16 @@ const submitFeed = (url, watchedState) => {
 
 const refreshFeeds = (watchedState) => {
   const { feeds } = watchedState.data;
-  const feedPromises = [];
-  feeds.forEach((feed) => {
+  const feedPromises = feeds.map((feed) => {
     const feedPromise = loadFeed(feed.rssUrl, watchedState)
       .catch((err) => {
         console.log(err);
       });
-    feedPromises.push(feedPromise);
+    return feedPromise;
   });
 
-  const refreshAll = Promise.all(feedPromises);
-  return refreshAll.then(() => setTimeout(refreshFeeds, 5 * 1000, watchedState));
+  const allFeeds = Promise.all(feedPromises);
+  return allFeeds.then(() => setTimeout(refreshFeeds, refreshTimeout, watchedState));
 };
 
 export default () => {
@@ -156,7 +150,7 @@ export default () => {
 
   const initPromise = i18n.init({
     lng: state.lng,
-    debug: false,
+    debug: !process.env.NODE_ENV === 'production',
     resources,
   }).then(() => {
     watchedState.rssForm.processState = stateStatuses.init;
