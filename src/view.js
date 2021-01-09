@@ -1,19 +1,19 @@
 import onChange from 'on-change';
+import i18n from 'i18next';
 import { stateStatuses } from './constants.js';
 
-const processStateHandler = (state, pageElements, processState, pageText) => {
-  const { rssForm } = pageElements;
-  const { feedback } = pageElements;
+const processStateHandler = (state, pageElements, processState) => {
+  const { rssForm, feedback } = pageElements;
 
   switch (processState) {
     case stateStatuses.init:
-      pageElements.title.textContent = pageText.t('title');
-      pageElements.desc.textContent = pageText.t('description');
-      pageElements.example.textContent = pageText.t('example');
-      pageElements.rssForm.input.setAttribute('placeholder', pageText.t('rssForm.placeholder'));
-      pageElements.rssForm.submit.textContent = pageText.t('rssForm.submit');
-      pageElements.modal.querySelector('.full-article').textContent = pageText.t('modal.article');
-      pageElements.modal.querySelector('.btn-secondary').textContent = pageText.t('modal.close');
+      pageElements.title.textContent = i18n.t('title');
+      pageElements.desc.textContent = i18n.t('description');
+      pageElements.example.textContent = i18n.t('example');
+      pageElements.rssForm.input.setAttribute('placeholder', i18n.t('rssForm.placeholder'));
+      pageElements.rssForm.submit.textContent = i18n.t('rssForm.submit');
+      pageElements.modal.querySelector('.full-article').textContent = i18n.t('modal.article');
+      pageElements.modal.querySelector('.btn-secondary').textContent = i18n.t('modal.close');
 
       break;
     case stateStatuses.validating:
@@ -22,7 +22,7 @@ const processStateHandler = (state, pageElements, processState, pageText) => {
 
       feedback.classList.remove('text-danger');
       feedback.classList.remove('text-success');
-      feedback.textContent = pageText.t('feedback.validatingRSS');
+      feedback.textContent = i18n.t('feedback.validatingRSS');
       break;
     case stateStatuses.processing:
       rssForm.input.classList.remove('is-invalid');
@@ -31,19 +31,16 @@ const processStateHandler = (state, pageElements, processState, pageText) => {
 
       feedback.classList.remove('text-danger');
       feedback.classList.remove('text-success');
-      feedback.textContent = pageText.t('feedback.submittingRSS');
+      feedback.textContent = i18n.t('feedback.submittingRSS');
       break;
     case stateStatuses.invalid:
-      if (!rssForm.input.classList.contains('is-invalid')) {
-        rssForm.input.classList.add('is-invalid');
-      }
+      rssForm.input.classList.add('is-invalid');
 
       rssForm.fieldset.disabled = false;
 
       feedback.classList.remove('text-success');
-      if (!feedback.classList.contains('text-danger')) {
-        feedback.classList.add('text-danger');
-      }
+      feedback.classList.add('text-danger');
+
       feedback.textContent = state.rssForm.processMsg;
       break;
     case stateStatuses.failed:
@@ -51,9 +48,8 @@ const processStateHandler = (state, pageElements, processState, pageText) => {
       rssForm.fieldset.disabled = false;
 
       feedback.classList.remove('text-success');
-      if (!feedback.classList.contains('text-danger')) {
-        feedback.classList.add('text-danger');
-      }
+      feedback.classList.add('text-danger');
+
       feedback.textContent = state.rssForm.processMsg;
       break;
     case stateStatuses.success:
@@ -61,13 +57,12 @@ const processStateHandler = (state, pageElements, processState, pageText) => {
 
       rssForm.fieldset.disabled = false;
 
-      rssForm.input.value = null;
+      rssForm.input.value = '';
       rssForm.input.focus();
 
       feedback.classList.remove('text-danger');
-      if (!feedback.classList.contains('text-success')) {
-        feedback.classList.add('text-success');
-      }
+      feedback.classList.add('text-success');
+
       feedback.textContent = state.rssForm.processMsg;
       break;
     default:
@@ -75,15 +70,15 @@ const processStateHandler = (state, pageElements, processState, pageText) => {
   }
 };
 
-const renderFeeds = (feeds, feedsEl, pageText) => {
+const renderFeeds = (feeds, feedsEl) => {
   if (feeds.length > 0) {
     const titleEl = document.createElement('h2');
-    titleEl.textContent = pageText.t('feeds.title');
+    titleEl.textContent = i18n.t('feeds.title');
 
     const listEl = document.createElement('ul');
     listEl.classList.add('list-group', 'mb-5');
 
-    feeds.forEach((feed) => {
+    const itemEls = feeds.map((feed) => {
       const itemEl = document.createElement('li');
       itemEl.classList.add('list-group-item');
 
@@ -96,9 +91,10 @@ const renderFeeds = (feeds, feedsEl, pageText) => {
       itemEl.appendChild(h3El);
       itemEl.appendChild(pEl);
 
-      listEl.prepend(itemEl);
+      return itemEl;
     });
 
+    listEl.prepend(...itemEls);
     const feedsFragment = document.createDocumentFragment();
     feedsFragment.appendChild(titleEl);
     feedsFragment.appendChild(listEl);
@@ -110,30 +106,27 @@ const renderFeeds = (feeds, feedsEl, pageText) => {
   }
 };
 
-const renderViewedPosts = (viewedPosts, postsEl) => {
-  viewedPosts.forEach((id) => {
-    const postEl = postsEl.querySelector(`a[data-id="${id}"]`);
-    postEl.classList.remove('font-weight-bold');
-    postEl.classList.add('font-weight-normal');
-  });
-};
-
-const renderPosts = (posts, postsEl, pageText, viewedPosts) => {
+const renderPosts = (posts, postsEl, viewedPosts) => {
   if (posts.length > 0) {
     const titleEl = document.createElement('h2');
-    titleEl.textContent = pageText.t('posts.title');
+    titleEl.textContent = i18n.t('posts.title');
 
     const listEl = document.createElement('ul');
     listEl.classList.add('list-group');
 
-    posts
-      .forEach((post) => {
+    const itemEls = posts
+      .map((post) => {
         const itemEl = document.createElement('li');
         itemEl.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-start');
 
         const aEl = document.createElement('a');
         aEl.href = post.link;
-        aEl.classList.add('font-weight-bold');
+        if (viewedPosts.has(post.id)) {
+          aEl.classList.add('font-weight-normal');
+        } else {
+          aEl.classList.add('font-weight-bold');
+        }
+
         aEl.setAttribute('data-id', post.id);
         aEl.setAttribute('target', '_blank');
         aEl.setAttribute('rel', 'noopener noreferrer');
@@ -145,22 +138,21 @@ const renderPosts = (posts, postsEl, pageText, viewedPosts) => {
         buttonEl.setAttribute('data-id', post.id);
         buttonEl.setAttribute('data-toggle', 'modal');
         buttonEl.setAttribute('data-target', '#modal');
-        buttonEl.textContent = pageText.t('posts.preview');
+        buttonEl.textContent = i18n.t('posts.preview');
 
         itemEl.appendChild(aEl);
         itemEl.appendChild(buttonEl);
 
-        listEl.prepend(itemEl);
+        return itemEl;
       });
 
+    listEl.prepend(...itemEls);
     const postsFragment = document.createDocumentFragment();
     postsFragment.appendChild(titleEl);
     postsFragment.appendChild(listEl);
 
     postsEl.innerHTML = '';
     postsEl.appendChild(postsFragment);
-
-    renderViewedPosts(viewedPosts, postsEl);
   } else {
     postsEl.innerHTML = '';
   }
@@ -172,20 +164,20 @@ const renderModal = (modal, modalEl) => {
   modalEl.querySelector('.full-article').href = modal.link;
 };
 
-export default (state, pageElements, pageText) => {
+export default (state, pageElements) => {
   const watchedState = onChange(state, (path, value) => {
     switch (path) {
       case 'rssForm.processState':
-        processStateHandler(state, pageElements, value, pageText);
+        processStateHandler(state, pageElements, value);
         break;
       case 'data.feeds':
-        renderFeeds(state.data.feeds, pageElements.feeds, pageText);
+        renderFeeds(state.data.feeds, pageElements.feeds);
         break;
       case 'data.posts':
-        renderPosts(state.data.posts, pageElements.posts, pageText, state.ui.viewedPosts);
+        renderPosts(state.data.posts, pageElements.posts, state.ui.viewedPosts);
         break;
       case 'ui.viewedPosts':
-        renderViewedPosts(state.ui.viewedPosts, pageElements.posts);
+        renderPosts(state.data.posts, pageElements.posts, state.ui.viewedPosts);
         break;
       case 'modal':
         renderModal(state.modal, pageElements.modal);
