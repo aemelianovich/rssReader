@@ -2,13 +2,14 @@ export default {
   translation: {
     title: 'RSS Reader',
     description: 'Start reading RSS today! It is easy, it is nicely.',
-    example: 'Example: https://ru.hexlet.io/lessons.rss',
+    example: 'Example:',
     feedback: {
       validatingRSS: 'Validating ...',
       invalidUrl: 'Must be valid url',
       existsRss: 'Rss has been loaded',
       addedRss: 'Rss was added',
       submittingRSS: 'Adding Rss ...',
+      invalidFeed: 'Unable to reed feed info. Please verify feed data.',
     },
     rssForm: {
       placeholder: 'RSS Link',

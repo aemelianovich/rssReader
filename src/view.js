@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 import onChange from 'on-change';
 import i18n from 'i18next';
 import { stateStatuses } from './constants.js';
@@ -9,7 +10,7 @@ const processStateHandler = (state, pageElements, processState) => {
     case stateStatuses.init:
       pageElements.title.textContent = i18n.t('title');
       pageElements.desc.textContent = i18n.t('description');
-      pageElements.example.textContent = i18n.t('example');
+      pageElements.example.textContent = `${i18n.t('example')} https://ru.hexlet.io/lessons.rss`;
       pageElements.rssForm.input.setAttribute('placeholder', i18n.t('rssForm.placeholder'));
       pageElements.rssForm.submit.textContent = i18n.t('rssForm.submit');
       pageElements.modal.querySelector('.full-article').textContent = i18n.t('modal.article');
@@ -37,6 +38,7 @@ const processStateHandler = (state, pageElements, processState) => {
       rssForm.input.classList.add('is-invalid');
 
       rssForm.fieldset.disabled = false;
+      rssForm.input.focus();
 
       feedback.classList.remove('text-success');
       feedback.classList.add('text-danger');
@@ -46,6 +48,7 @@ const processStateHandler = (state, pageElements, processState) => {
     case stateStatuses.failed:
       rssForm.input.classList.remove('is-invalid');
       rssForm.fieldset.disabled = false;
+      rssForm.input.focus();
 
       feedback.classList.remove('text-success');
       feedback.classList.add('text-danger');
@@ -63,7 +66,7 @@ const processStateHandler = (state, pageElements, processState) => {
       feedback.classList.remove('text-danger');
       feedback.classList.add('text-success');
 
-      feedback.textContent = state.rssForm.processMsg;
+      feedback.textContent = i18n.t('feedback.addedRss');
       break;
     default:
       throw new Error(`Unknown state: ${processState}`);

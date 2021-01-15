@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 import 'bootstrap';
 import 'bootstrap/dist/css/bootstrap.css';
 import * as yup from 'yup';
@@ -8,22 +9,18 @@ import createWatchedState from './view.js';
 import resources from './locales';
 import { stateStatuses, refreshTimeout } from './constants.js';
 
-const validateRssForm = (url, feeds) => {
-  yup.setLocale({
-    string: {
-      url: i18n.t('feedback.invalidUrl'),
-    },
-  });
+const getProxyUrl = () => 'https://api.allorigins.win/';
 
+const validateRssForm = (url, feeds) => {
   const addedUrls = feeds.map(({ rssUrl }) => (rssUrl));
 
-  const urlSchema = yup.string().url().notOneOf(addedUrls, i18n.t('feedback.existsRss'));
+  const urlSchema = yup.string().url().notOneOf(addedUrls, (str) => ({ key: 'feedback.existsRss', values: { str } }));
 
   try {
     urlSchema.validateSync(url);
     return null;
   } catch (err) {
-    return err.message;
+    return i18n.t(err.message.key);
   }
 };
 
@@ -31,7 +28,8 @@ const parseRss = (rssData) => {
   const rssDocument = new DOMParser().parseFromString(rssData, 'text/xml');
   const errorEl = rssDocument.querySelector('parsererror');
   if (errorEl !== null) {
-    throw new Error(errorEl.textContent);
+    console.log(errorEl.textContent);
+    throw new Error(i18n.t('feedback.invalidFeed'));
   }
 
   const postElements = [...rssDocument.querySelectorAll('channel > item')];
@@ -58,7 +56,7 @@ const loadFeed = (url, watchedState) => axios({
   params: {
     url: `${url}`,
   },
-  baseURL: 'https://api.allorigins.win/',
+  baseURL: getProxyUrl(),
 })
   .then((response) => {
     const channel = parseRss(response.data.contents);
@@ -77,18 +75,21 @@ const loadFeed = (url, watchedState) => axios({
         title: post.title,
         link: post.link,
         desc: post.description,
-      }))
-      .reverse();
+      }));
 
-    watchedState.data.feeds = _.uniqBy([...watchedState.data.feeds, feed], 'rssUrl');
-    watchedState.data.posts = _.uniqBy([...watchedState.data.posts, ...posts], 'link');
+    // Need to check feed existence for the refresh operation which does not have validation
+    if (_.find(watchedState.data.feeds, { rssUrl: feed.rssUrl }) === undefined) {
+      watchedState.data.feeds = [feed, ...watchedState.data.feeds];
+    }
+
+    const newPosts = _.differenceBy(posts, watchedState.data.posts, 'link');
+    watchedState.data.posts = [...newPosts, ...watchedState.data.posts];
   });
 
 const submitFeed = (url, watchedState) => {
   watchedState.rssForm.processState = stateStatuses.processing;
   return loadFeed(url, watchedState)
     .then(() => {
-      watchedState.rssForm.processMsg = i18n.t('feedback.addedRss');
       watchedState.rssForm.processState = stateStatuses.success;
     })
     .catch((err) => {
@@ -127,8 +128,13 @@ export default () => {
     ui: {
       viewedPosts: new Set(),
     },
-    errors: [],
   };
+
+  yup.setLocale({
+    string: {
+      url: ({ str }) => ({ key: 'feedback.invalidUrl', values: { str } }),
+    },
+  });
 
   const pageElements = {
     title: document.querySelector('h1'),
@@ -146,7 +152,7 @@ export default () => {
     modal: document.querySelector('#modal'),
   };
 
-  const watchedState = createWatchedState(state, pageElements, i18n);
+  const watchedState = createWatchedState(state, pageElements);
 
   const initPromise = i18n.init({
     lng: state.lng,
@@ -175,9 +181,7 @@ export default () => {
     pageElements.posts.addEventListener('click', (e) => {
       if (e.target.getAttribute('data-target') === '#modal') {
         const postId = e.target.getAttribute('data-id');
-        const postPreviewIndex = _.findIndex(watchedState.data.posts,
-          (currPost) => (currPost.id === postId));
-        const postPreview = watchedState.data.posts[postPreviewIndex];
+        const postPreview = _.find(watchedState.data.posts, { id: postId });
 
         watchedState.ui.viewedPosts.add(postPreview.id);
         watchedState.modal = {
@@ -191,7 +195,6 @@ export default () => {
 
     setTimeout(refreshFeeds, refreshTimeout, watchedState);
   }).catch((err) => {
-    watchedState.errors.push(err);
     throw err;
   });
 
