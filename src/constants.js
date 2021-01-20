@@ -1,6 +1,5 @@
 const stateStatuses = {
   init: 'init',
-  validating: 'validating',
   invalid: 'invalid',
   processing: 'processing',
   failed: 'failed',

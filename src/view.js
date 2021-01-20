@@ -17,14 +17,6 @@ const processStateHandler = (state, pageElements, processState) => {
       pageElements.modal.querySelector('.btn-secondary').textContent = i18n.t('modal.close');
 
       break;
-    case stateStatuses.validating:
-      rssForm.input.classList.remove('is-invalid');
-      rssForm.fieldset.disabled = true;
-
-      feedback.classList.remove('text-danger');
-      feedback.classList.remove('text-success');
-      feedback.textContent = i18n.t('feedback.validatingRSS');
-      break;
     case stateStatuses.processing:
       rssForm.input.classList.remove('is-invalid');
 

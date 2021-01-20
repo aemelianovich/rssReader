@@ -4,7 +4,6 @@ export default {
     description: 'Скачивайте RSS сегодня! Это легко и просто.',
     example: 'Пример:',
     feedback: {
-      validatingRSS: 'Валидация ...',
       invalidUrl: 'Введите корректную ссылку',
       existsRss: 'RSS канал уже был добавлен',
       addedRss: 'RSS канал добавлен',

@@ -9,7 +9,7 @@ import createWatchedState from './view.js';
 import resources from './locales';
 import { stateStatuses, refreshTimeout } from './constants.js';
 
-const getProxyUrl = () => 'https://api.allorigins.win/';
+const getUrlWithProxy = (rssUrl) => `https://api.allorigins.win/get?url=${rssUrl}`;
 
 const validateRssForm = (url, feeds) => {
   const addedUrls = feeds.map(({ rssUrl }) => (rssUrl));
@@ -50,20 +50,23 @@ const parseRss = (rssData) => {
   return channel;
 };
 
-const loadFeed = (url, watchedState) => axios({
-  method: 'get',
-  url: '/get',
-  params: {
-    url: `${url}`,
-  },
-  baseURL: getProxyUrl(),
-})
+const addFeed = (watchedState, feed) => {
+  watchedState.data.feeds = [feed, ...watchedState.data.feeds];
+};
+
+const addPosts = (watchedState, posts) => {
+  const newPosts = _.differenceBy(posts, watchedState.data.posts, 'link');
+  watchedState.data.posts = [...newPosts, ...watchedState.data.posts];
+};
+
+const getFeedInfo = (url) => axios
+  .get(getUrlWithProxy(url))
   .then((response) => {
     const channel = parseRss(response.data.contents);
 
     const feed = {
       id: _.uniqueId(),
-      rssUrl: response.config.params.url,
+      rssUrl: response.data.status.url,
       title: channel.title,
       desc: channel.description,
     };
@@ -77,32 +80,31 @@ const loadFeed = (url, watchedState) => axios({
         desc: post.description,
       }));
 
-    // Need to check feed existence for the refresh operation which does not have validation
-    if (_.find(watchedState.data.feeds, { rssUrl: feed.rssUrl }) === undefined) {
-      watchedState.data.feeds = [feed, ...watchedState.data.feeds];
-    }
-
-    const newPosts = _.differenceBy(posts, watchedState.data.posts, 'link');
-    watchedState.data.posts = [...newPosts, ...watchedState.data.posts];
+    return {
+      feed,
+      posts,
+    };
   });
 
-const submitFeed = (url, watchedState) => {
-  watchedState.rssForm.processState = stateStatuses.processing;
-  return loadFeed(url, watchedState)
-    .then(() => {
-      watchedState.rssForm.processState = stateStatuses.success;
-    })
-    .catch((err) => {
-      console.log(err);
-      watchedState.rssForm.processMsg = err.message;
-      watchedState.rssForm.processState = stateStatuses.failed;
-    });
-};
+const submitFeed = (url, watchedState) => getFeedInfo(url)
+  .then((feedData) => {
+    addFeed(watchedState, feedData.feed);
+    addPosts(watchedState, feedData.posts);
+    watchedState.rssForm.processState = stateStatuses.success;
+  })
+  .catch((err) => {
+    console.log(err);
+    watchedState.rssForm.processMsg = err.message;
+    watchedState.rssForm.processState = stateStatuses.failed;
+  });
 
 const refreshFeeds = (watchedState) => {
   const { feeds } = watchedState.data;
   const feedPromises = feeds.map((feed) => {
-    const feedPromise = loadFeed(feed.rssUrl, watchedState)
+    const feedPromise = getFeedInfo(feed.rssUrl)
+      .then((feedData) => {
+        addPosts(watchedState, feedData.posts);
+      })
       .catch((err) => {
         console.log(err);
       });
@@ -110,7 +112,7 @@ const refreshFeeds = (watchedState) => {
   });
 
   const allFeeds = Promise.all(feedPromises);
-  return allFeeds.then(() => setTimeout(refreshFeeds, refreshTimeout, watchedState));
+  return allFeeds.finally(() => setTimeout(refreshFeeds, refreshTimeout, watchedState));
 };
 
 export default () => {
@@ -129,12 +131,6 @@ export default () => {
       viewedPosts: new Set(),
     },
   };
-
-  yup.setLocale({
-    string: {
-      url: ({ str }) => ({ key: 'feedback.invalidUrl', values: { str } }),
-    },
-  });
 
   const pageElements = {
     title: document.querySelector('h1'),
@@ -161,13 +157,19 @@ export default () => {
   }).then(() => {
     watchedState.rssForm.processState = stateStatuses.init;
 
+    yup.setLocale({
+      string: {
+        url: ({ str }) => ({ key: 'feedback.invalidUrl', values: { str } }),
+      },
+    });
+
     pageElements.rssForm.form.addEventListener('submit', (e) => {
       e.preventDefault();
       const rssForm = new FormData(e.target);
 
       const url = rssForm.get('url');
 
-      watchedState.rssForm.processState = stateStatuses.validating;
+      watchedState.rssForm.processState = stateStatuses.processing;
       const errMsg = validateRssForm(url, watchedState.data.feeds);
 
       if (errMsg === null) {
