@@ -50,22 +50,12 @@ const parseRss = (rssData) => {
   return channel;
 };
 
-const addFeed = (watchedState, feed) => {
-  watchedState.data.feeds = [feed, ...watchedState.data.feeds];
-};
-
-const addPosts = (watchedState, posts) => {
-  const newPosts = _.differenceBy(posts, watchedState.data.posts, 'link');
-  watchedState.data.posts = [...newPosts, ...watchedState.data.posts];
-};
-
-const getFeedInfo = (url) => axios
+const getFeedData = (url) => axios
   .get(getUrlWithProxy(url))
   .then((response) => {
     const channel = parseRss(response.data.contents);
 
     const feed = {
-      id: _.uniqueId(),
       rssUrl: response.data.status.url,
       title: channel.title,
       desc: channel.description,
@@ -73,8 +63,6 @@ const getFeedInfo = (url) => axios
 
     const posts = channel.posts
       .map((post) => ({
-        feedId: feed.id,
-        id: _.uniqueId(),
         title: post.title,
         link: post.link,
         desc: post.description,
@@ -86,10 +74,14 @@ const getFeedInfo = (url) => axios
     };
   });
 
-const submitFeed = (url, watchedState) => getFeedInfo(url)
+const submitFeed = (url, watchedState) => getFeedData(url)
   .then((feedData) => {
-    addFeed(watchedState, feedData.feed);
-    addPosts(watchedState, feedData.posts);
+    const feed = { id: _.uniqueId(), ...feedData.feed };
+    watchedState.data.feeds = [feed, ...watchedState.data.feeds];
+
+    const posts = feedData.posts.map((post) => ({ feedId: feed.id, id: _.uniqueId(), ...post }));
+    watchedState.data.posts = [...posts, ...watchedState.data.posts];
+
     watchedState.rssForm.processState = stateStatuses.success;
   })
   .catch((err) => {
@@ -101,9 +93,13 @@ const submitFeed = (url, watchedState) => getFeedInfo(url)
 const refreshFeeds = (watchedState) => {
   const { feeds } = watchedState.data;
   const feedPromises = feeds.map((feed) => {
-    const feedPromise = getFeedInfo(feed.rssUrl)
+    const feedPromise = getFeedData(feed.rssUrl)
       .then((feedData) => {
-        addPosts(watchedState, feedData.posts);
+        const existingFeedPosts = watchedState.data.posts
+          .filter((post) => post.feedId === feed.id);
+        const newPosts = _.differenceBy(feedData.posts, existingFeedPosts, 'link')
+          .map((newPost) => ({ feedId: feed.id, id: _.uniqueId(), ...newPost }));
+        watchedState.data.posts = [...newPosts, ...watchedState.data.posts];
       })
       .catch((err) => {
         console.log(err);
