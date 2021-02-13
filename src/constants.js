@@ -6,6 +6,13 @@ const stateStatuses = {
   success: 'success',
 };
 
+const processMsgTypes = {
+  networkError: 'networkError',
+  invalidFeed: 'invalidFeed',
+  invalidUrl: 'invalidUrl',
+  existsRss: 'existsRss',
+};
+
 const refreshTimeout = 5 * 1000;
 
-export { refreshTimeout, stateStatuses };
+export { refreshTimeout, stateStatuses, processMsgTypes };

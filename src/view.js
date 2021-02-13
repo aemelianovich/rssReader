@@ -1,7 +1,23 @@
 /* eslint-disable no-param-reassign */
 import onChange from 'on-change';
 import i18n from 'i18next';
-import { stateStatuses } from './constants.js';
+import { stateStatuses, processMsgTypes } from './constants.js';
+
+const getMsg = (msgType) => {
+  switch (msgType) {
+    case processMsgTypes.networkError:
+      return i18n.t('feedback.networkError');
+    case processMsgTypes.invalidFeed:
+      return i18n.t('feedback.invalidFeed');
+    case processMsgTypes.invalidUrl:
+      return i18n.t('feedback.invalidUrl');
+    case processMsgTypes.existsRss:
+      return i18n.t('feedback.existsRss');
+    default:
+      console.log(new Error(`Undefined message type: ${msgType}`));
+      return i18n.t('feedback.undefined');
+  }
+};
 
 const processStateHandler = (state, pageElements, processState) => {
   const { rssForm, feedback } = pageElements;
@@ -35,7 +51,7 @@ const processStateHandler = (state, pageElements, processState) => {
       feedback.classList.remove('text-success');
       feedback.classList.add('text-danger');
 
-      feedback.textContent = state.rssForm.processMsg;
+      feedback.textContent = getMsg(state.rssForm.processMsgType);
       break;
     case stateStatuses.failed:
       rssForm.input.classList.remove('is-invalid');
@@ -45,7 +61,7 @@ const processStateHandler = (state, pageElements, processState) => {
       feedback.classList.remove('text-success');
       feedback.classList.add('text-danger');
 
-      feedback.textContent = state.rssForm.processMsg;
+      feedback.textContent = getMsg(state.rssForm.processMsgType);
       break;
     case stateStatuses.success:
       rssForm.input.classList.remove('is-invalid');
@@ -66,97 +82,98 @@ const processStateHandler = (state, pageElements, processState) => {
 };
 
 const renderFeeds = (feeds, feedsEl) => {
-  if (feeds.length > 0) {
-    const titleEl = document.createElement('h2');
-    titleEl.textContent = i18n.t('feeds.title');
+  if (feeds.length === 0) {
+    feedsEl.innerHTML = '';
+  }
 
-    const listEl = document.createElement('ul');
-    listEl.classList.add('list-group', 'mb-5');
+  const titleEl = document.createElement('h2');
+  titleEl.textContent = i18n.t('feeds.title');
 
-    const itemEls = feeds.map((feed) => {
+  const listEl = document.createElement('ul');
+  listEl.classList.add('list-group', 'mb-5');
+
+  const itemEls = feeds.map((feed) => {
+    const itemEl = document.createElement('li');
+    itemEl.classList.add('list-group-item');
+
+    const h3El = document.createElement('h3');
+    h3El.textContent = feed.title;
+
+    const pEl = document.createElement('p');
+    pEl.textContent = feed.desc;
+
+    itemEl.appendChild(h3El);
+    itemEl.appendChild(pEl);
+
+    return itemEl;
+  });
+
+  listEl.prepend(...itemEls);
+  const feedsFragment = document.createDocumentFragment();
+  feedsFragment.appendChild(titleEl);
+  feedsFragment.appendChild(listEl);
+
+  feedsEl.innerHTML = '';
+  feedsEl.appendChild(feedsFragment);
+};
+
+const renderPosts = (posts, postsEl, viewedPosts) => {
+  if (posts.length === 0) {
+    postsEl.innerHTML = '';
+  }
+
+  const titleEl = document.createElement('h2');
+  titleEl.textContent = i18n.t('posts.title');
+
+  const listEl = document.createElement('ul');
+  listEl.classList.add('list-group');
+
+  const itemEls = posts
+    .map((post) => {
       const itemEl = document.createElement('li');
-      itemEl.classList.add('list-group-item');
+      itemEl.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-start');
 
-      const h3El = document.createElement('h3');
-      h3El.textContent = feed.title;
+      const aEl = document.createElement('a');
+      aEl.href = post.link;
+      if (viewedPosts.has(post.id)) {
+        aEl.classList.add('font-weight-normal');
+      } else {
+        aEl.classList.add('font-weight-bold');
+      }
 
-      const pEl = document.createElement('p');
-      pEl.textContent = feed.desc;
+      aEl.setAttribute('data-id', post.id);
+      aEl.setAttribute('target', '_blank');
+      aEl.setAttribute('rel', 'noopener noreferrer');
+      aEl.textContent = post.title;
 
-      itemEl.appendChild(h3El);
-      itemEl.appendChild(pEl);
+      const buttonEl = document.createElement('button');
+      buttonEl.type = 'button';
+      buttonEl.classList.add('btn', 'btn-primary', 'btn-sm');
+      buttonEl.setAttribute('data-id', post.id);
+      buttonEl.setAttribute('data-toggle', 'modal');
+      buttonEl.setAttribute('data-target', '#modal');
+      buttonEl.textContent = i18n.t('posts.preview');
+
+      itemEl.appendChild(aEl);
+      itemEl.appendChild(buttonEl);
 
       return itemEl;
     });
 
-    listEl.prepend(...itemEls);
-    const feedsFragment = document.createDocumentFragment();
-    feedsFragment.appendChild(titleEl);
-    feedsFragment.appendChild(listEl);
+  listEl.prepend(...itemEls);
+  const postsFragment = document.createDocumentFragment();
+  postsFragment.appendChild(titleEl);
+  postsFragment.appendChild(listEl);
 
-    feedsEl.innerHTML = '';
-    feedsEl.appendChild(feedsFragment);
-  } else {
-    feedsEl.innerHTML = '';
-  }
+  postsEl.innerHTML = '';
+  postsEl.appendChild(postsFragment);
 };
 
-const renderPosts = (posts, postsEl, viewedPosts) => {
-  if (posts.length > 0) {
-    const titleEl = document.createElement('h2');
-    titleEl.textContent = i18n.t('posts.title');
-
-    const listEl = document.createElement('ul');
-    listEl.classList.add('list-group');
-
-    const itemEls = posts
-      .map((post) => {
-        const itemEl = document.createElement('li');
-        itemEl.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-start');
-
-        const aEl = document.createElement('a');
-        aEl.href = post.link;
-        if (viewedPosts.has(post.id)) {
-          aEl.classList.add('font-weight-normal');
-        } else {
-          aEl.classList.add('font-weight-bold');
-        }
-
-        aEl.setAttribute('data-id', post.id);
-        aEl.setAttribute('target', '_blank');
-        aEl.setAttribute('rel', 'noopener noreferrer');
-        aEl.textContent = post.title;
-
-        const buttonEl = document.createElement('button');
-        buttonEl.type = 'button';
-        buttonEl.classList.add('btn', 'btn-primary', 'btn-sm');
-        buttonEl.setAttribute('data-id', post.id);
-        buttonEl.setAttribute('data-toggle', 'modal');
-        buttonEl.setAttribute('data-target', '#modal');
-        buttonEl.textContent = i18n.t('posts.preview');
-
-        itemEl.appendChild(aEl);
-        itemEl.appendChild(buttonEl);
-
-        return itemEl;
-      });
-
-    listEl.prepend(...itemEls);
-    const postsFragment = document.createDocumentFragment();
-    postsFragment.appendChild(titleEl);
-    postsFragment.appendChild(listEl);
-
-    postsEl.innerHTML = '';
-    postsEl.appendChild(postsFragment);
-  } else {
-    postsEl.innerHTML = '';
-  }
-};
-
-const renderModal = (modal, modalEl) => {
-  modalEl.querySelector('.modal-title').textContent = modal.title;
-  modalEl.querySelector('.modal-body').textContent = modal.desc;
-  modalEl.querySelector('.full-article').href = modal.link;
+const renderModal = (posts, modal, modalEl) => {
+  const postPreview = _.find(posts, { id: modal.id });
+  modalEl.querySelector('.modal-title').textContent = postPreview.title;
+  modalEl.querySelector('.modal-body').textContent = postPreview.desc;
+  modalEl.querySelector('.full-article').href = postPreview.link;
 };
 
 export default (state, pageElements) => {
@@ -175,7 +192,7 @@ export default (state, pageElements) => {
         renderPosts(state.data.posts, pageElements.posts, state.ui.viewedPosts);
         break;
       case 'modal':
-        renderModal(state.modal, pageElements.modal);
+        renderModal(watchedState.data.posts, state.modal, pageElements.modal);
         break;
       default:
         break;

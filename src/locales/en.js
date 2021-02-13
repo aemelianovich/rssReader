@@ -9,6 +9,8 @@ export default {
       addedRss: 'Rss was added',
       submittingRSS: 'Adding Rss ...',
       invalidFeed: 'Unable to reed feed info. Please verify feed data.',
+      networkError: 'Network error. Check internet connection and try again.',
+      undefined: 'Unknown Error. Please contact support team.',
     },
     rssForm: {
       placeholder: 'RSS Link',

@@ -7,20 +7,21 @@ import _ from 'lodash';
 import i18n from 'i18next';
 import createWatchedState from './view.js';
 import resources from './locales';
-import { stateStatuses, refreshTimeout } from './constants.js';
+import { stateStatuses, refreshTimeout, processMsgTypes } from './constants.js';
 
 const getUrlWithProxy = (rssUrl) => `https://api.allorigins.win/get?url=${rssUrl}`;
 
 const validateRssForm = (url, feeds) => {
   const addedUrls = feeds.map(({ rssUrl }) => (rssUrl));
 
-  const urlSchema = yup.string().url().notOneOf(addedUrls, (str) => ({ key: 'feedback.existsRss', values: { str } }));
+  const urlSchema = yup.string().url()
+    .notOneOf(addedUrls, (str) => ({ key: processMsgTypes.existsRss, values: { str } }));
 
   try {
     urlSchema.validateSync(url);
     return null;
   } catch (err) {
-    return i18n.t(err.message.key);
+    return err.message.key;
   }
 };
 
@@ -29,7 +30,7 @@ const parseRss = (rssData) => {
   const errorEl = rssDocument.querySelector('parsererror');
   if (errorEl !== null) {
     console.log(errorEl.textContent);
-    throw new Error(i18n.t('feedback.invalidFeed'));
+    throw new Error(processMsgTypes.invalidFeed);
   }
 
   const postElements = [...rssDocument.querySelectorAll('channel > item')];
@@ -54,39 +55,41 @@ const getFeedData = (url) => axios
   .get(getUrlWithProxy(url))
   .then((response) => {
     const channel = parseRss(response.data.contents);
+    channel.rssUrl = response.data.status.url;
 
-    const feed = {
-      rssUrl: response.data.status.url,
-      title: channel.title,
-      desc: channel.description,
-    };
-
-    const posts = channel.posts
-      .map((post) => ({
-        title: post.title,
-        link: post.link,
-        desc: post.description,
-      }));
-
-    return {
-      feed,
-      posts,
-    };
+    return channel;
   });
 
 const submitFeed = (url, watchedState) => getFeedData(url)
   .then((feedData) => {
-    const feed = { id: _.uniqueId(), ...feedData.feed };
+    const feed = {
+      id: _.uniqueId(),
+      rssUrl: feedData.rssUrl,
+      title: feedData.title,
+      desc: feedData.description,
+    };
     watchedState.data.feeds = [feed, ...watchedState.data.feeds];
 
-    const posts = feedData.posts.map((post) => ({ feedId: feed.id, id: _.uniqueId(), ...post }));
+    const posts = feedData.posts.map((post) => (
+      {
+        feedId: feed.id,
+        id: _.uniqueId(),
+        title: post.title,
+        link: post.link,
+        desc: post.description,
+      }));
     watchedState.data.posts = [...posts, ...watchedState.data.posts];
 
     watchedState.rssForm.processState = stateStatuses.success;
   })
   .catch((err) => {
     console.log(err);
-    watchedState.rssForm.processMsg = err.message;
+    if (err.isAxiosError) {
+      watchedState.rssForm.processMsgType = processMsgTypes.networkError;
+    } else {
+      watchedState.rssForm.processMsgType = err.message;
+    }
+
     watchedState.rssForm.processState = stateStatuses.failed;
   });
 
@@ -98,7 +101,14 @@ const refreshFeeds = (watchedState) => {
         const existingFeedPosts = watchedState.data.posts
           .filter((post) => post.feedId === feed.id);
         const newPosts = _.differenceBy(feedData.posts, existingFeedPosts, 'link')
-          .map((newPost) => ({ feedId: feed.id, id: _.uniqueId(), ...newPost }));
+          .map((newPost) => (
+            {
+              feedId: feed.id,
+              id: _.uniqueId(),
+              title: newPost.title,
+              link: newPost.link,
+              desc: newPost.description,
+            }));
         watchedState.data.posts = [...newPosts, ...watchedState.data.posts];
       })
       .catch((err) => {
@@ -116,7 +126,7 @@ export default () => {
     lng: 'ru',
     rssForm: {
       processState: null,
-      processMsg: null,
+      processMsgType: null,
     },
     data: {
       feeds: [],
@@ -155,7 +165,7 @@ export default () => {
 
     yup.setLocale({
       string: {
-        url: ({ str }) => ({ key: 'feedback.invalidUrl', values: { str } }),
+        url: ({ str }) => ({ key: processMsgTypes.invalidUrl, values: { str } }),
       },
     });
 
@@ -171,7 +181,7 @@ export default () => {
       if (errMsg === null) {
         submitFeed(url, watchedState);
       } else {
-        watchedState.rssForm.processMsg = errMsg;
+        watchedState.rssForm.processMsgType = errMsg;
         watchedState.rssForm.processState = stateStatuses.invalid;
       }
     });
@@ -179,21 +189,14 @@ export default () => {
     pageElements.posts.addEventListener('click', (e) => {
       if (e.target.getAttribute('data-target') === '#modal') {
         const postId = e.target.getAttribute('data-id');
-        const postPreview = _.find(watchedState.data.posts, { id: postId });
-
-        watchedState.ui.viewedPosts.add(postPreview.id);
+        watchedState.ui.viewedPosts.add(postId);
         watchedState.modal = {
-          id: postPreview.id,
-          title: postPreview.title,
-          desc: postPreview.desc,
-          link: postPreview.link,
+          id: postId,
         };
       }
     });
 
     setTimeout(refreshFeeds, refreshTimeout, watchedState);
-  }).catch((err) => {
-    throw err;
   });
 
   return initPromise;
