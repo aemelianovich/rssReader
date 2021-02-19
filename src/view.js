@@ -1,6 +1,7 @@
 /* eslint-disable no-param-reassign */
 import onChange from 'on-change';
 import i18n from 'i18next';
+import _ from 'lodash';
 import { stateStatuses, processMsgTypes } from './constants.js';
 
 const getMsg = (msgType) => {
@@ -13,6 +14,8 @@ const getMsg = (msgType) => {
       return i18n.t('feedback.invalidUrl');
     case processMsgTypes.existsRss:
       return i18n.t('feedback.existsRss');
+    case processMsgTypes.undefined:
+      return i18n.t('feedback.undefined');
     default:
       console.log(new Error(`Undefined message type: ${msgType}`));
       return i18n.t('feedback.undefined');

@@ -21,7 +21,7 @@ const validateRssForm = (url, feeds) => {
     urlSchema.validateSync(url);
     return null;
   } catch (err) {
-    return err.message.key;
+    return err;
   }
 };
 
@@ -30,7 +30,9 @@ const parseRss = (rssData) => {
   const errorEl = rssDocument.querySelector('parsererror');
   if (errorEl !== null) {
     console.log(errorEl.textContent);
-    throw new Error(processMsgTypes.invalidFeed);
+    const error = new Error(errorEl.textContent);
+    error.isParsingError = true;
+    throw error;
   }
 
   const postElements = [...rssDocument.querySelectorAll('channel > item')];
@@ -83,13 +85,15 @@ const submitFeed = (url, watchedState) => getFeedData(url)
     watchedState.rssForm.processState = stateStatuses.success;
   })
   .catch((err) => {
-    console.log(err);
     if (err.isAxiosError) {
       watchedState.rssForm.processMsgType = processMsgTypes.networkError;
+    } else if (err.isParsingError) {
+      watchedState.rssForm.processMsgType = processMsgTypes.invalidFeed;
     } else {
-      watchedState.rssForm.processMsgType = err.message;
+      watchedState.rssForm.processMsgType = processMsgTypes.undefined;
     }
 
+    console.log(err);
     watchedState.rssForm.processState = stateStatuses.failed;
   });
 
@@ -176,12 +180,12 @@ export default () => {
       const url = rssForm.get('url');
 
       watchedState.rssForm.processState = stateStatuses.processing;
-      const errMsg = validateRssForm(url, watchedState.data.feeds);
+      const err = validateRssForm(url, watchedState.data.feeds);
 
-      if (errMsg === null) {
+      if (err === null) {
         submitFeed(url, watchedState);
       } else {
-        watchedState.rssForm.processMsgType = errMsg;
+        watchedState.rssForm.processMsgType = err.message.key;
         watchedState.rssForm.processState = stateStatuses.invalid;
       }
     });

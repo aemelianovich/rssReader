@@ -11,6 +11,7 @@ const processMsgTypes = {
   invalidFeed: 'invalidFeed',
   invalidUrl: 'invalidUrl',
   existsRss: 'existsRss',
+  undefined: 'undefined',
 };
 
 const refreshTimeout = 5 * 1000;
