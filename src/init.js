@@ -127,7 +127,7 @@ const refreshFeeds = (watchedState) => {
 
 export default () => {
   const state = {
-    lng: 'ru',
+    lng: 'en',
     rssForm: {
       processState: null,
       processMsgType: null,
